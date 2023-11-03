@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="/main.css" rel="stylesheet"/>
+</head>
+<body class="grey-bg">
+    <!-- %- : include 문법 사용할 때 or 사용하면 html 이 렌더링되어 나옴 -->
+    <%- include('nav.ejs') %>
+    <!-- <%= JSON.stringify(posts) %> -->
+    <div class="white-bg">
+        <!-- % : html 사이에 js 문법 쓸 때 -->
+        <% for(let i=0; i<posts.length; i++){ %>
+            <div class="list-box">
+                <!-- %= : 사용하면 html 이 문자처럼 나옴 -->
+                <h4>
+                    <a href="/detail/<%= posts[i]._id %>">
+                        <%= posts[i].title %>
+                    </a> 
+                    <a href="/edit/<%= posts[i]._id %>">✏️</a>
+                    <span>🗑️</span>
+                </h4>
+                <p><%= posts[i].content %></p>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>
