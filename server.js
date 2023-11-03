@@ -97,3 +97,33 @@ app.put('/edit', async (request, response) => {
     response.redirect('/list');
 })
 
+app.delete('/delete', async (request, response) => {
+    // console.log(request.query)
+    await db.collection('post').deleteOne({
+        _id: new ObjectId(request.query.docId)
+    })
+    response.send('success')
+})
+
+//pagination 첫번쨰
+app.get('/list/:id', async (request, response) => {
+    // console.log(request.params)
+    let result = await db.collection('post')
+        .find()
+        .skip((request.params.id - 1)*5)
+        .limit(5)
+        .toArray()
+
+    response.render('list.ejs', {posts: result})
+})
+
+//pagination 두번째 방법
+app.get('/list/next/:id', async (request, response) => {
+    // console.log(request.params)
+    let result = await db.collection('post')
+        .find({_id: {$gt : new ObjectId(request.params.id) }})
+        .limit(5)
+        .toArray()
+
+    response.render('list.ejs', {posts: result})
+})

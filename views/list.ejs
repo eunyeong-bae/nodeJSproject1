@@ -20,11 +20,31 @@
                         <%= posts[i].title %>
                     </a> 
                     <a href="/edit/<%= posts[i]._id %>">✏️</a>
-                    <span>🗑️</span>
+                    <span class="delete" data-id="<%= posts[i]._id %>">🗑️</span>
                 </h4>
                 <p><%= posts[i].content %></p>
             </div>
+
         <% } %>
+        <a href="/list/next/<%= posts[posts.length - 1]._id %>">다음</a>
     </div>
+
+    <script>
+        for(let i =0; i< '<%= posts.length %>' ; i++){
+            document.querySelectorAll('.delete')[i]
+            .addEventListener('click', function(e) {
+                const id = e.target.dataset.id;
+
+                //서버에 삭제요청 날리기
+                fetch(`/delete?docId=${id}`, {
+                    method: 'DELETE',
+                })
+                .then((r) => r.text())
+                .then((r) =>
+                    e.target.parentElement.parentElement.style.display = 'none'
+                )
+            })
+        }
+    </script>
 </body>
 </html>
