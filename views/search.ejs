@@ -16,18 +16,16 @@
         <input class="search" type="text" placeholder="검색어 입력" name="search"/>
         <button class="search-send" type="submit">검색</button>
     </form> -->
-    
+
     <!-- 2.script 로 요청하기 -->
-    <input class="search" type="text" placeholder="검색어 입력" name="search"/>
-    <button class="search-send" type="submit">검색</button>
-    
     <script>
         document.querySelector('.search-send').addEventListener('click', function(){
-            let val = document.querySelector('.search').value;
-            location.href = '/search?search='+val;
+            let search = document.querySelector('.search').value;
+            location.href = '/search?val='+search;
         })
     </script>    
 
+    <h4>검색 결과</h4>
     <div class="white-bg">
         <!-- % : html 사이에 js 문법 쓸 때 -->
         <% for(let i=0; i<posts.length; i++){ %>
@@ -44,25 +42,6 @@
             </div>
 
         <% } %>
-        <a href="/list/next/<%= posts[posts.length - 1]._id %>">다음</a>
     </div>
-
-    <script>
-        for(let i =0; i< '<%= posts.length %>' ; i++){
-            document.querySelectorAll('.delete')[i]
-            .addEventListener('click', function(e) {
-                const id = e.target.dataset.id;
-
-                //서버에 삭제요청 날리기
-                fetch(`/delete?docId=${id}`, {
-                    method: 'DELETE',
-                })
-                .then((r) => r.text())
-                .then((r) =>
-                    e.target.parentElement.parentElement.style.display = 'none'
-                )
-            })
-        }
-    </script>
 </body>
 </html>

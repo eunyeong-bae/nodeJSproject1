@@ -103,7 +103,7 @@ app.get('/', (request, response) => {
     response.sendFile(__dirname+'/index.html')
 })
 
-app.get('/list', (request, response, next) => {console.log(new Date()); next()}, async (request, response) => {
+app.get('/list',async (request, response) => {
     let result = await db.collection('post').find().toArray()
     response.render('list.ejs', {posts: result})
 })
@@ -120,7 +120,9 @@ app.post('/newpost', async (request, response) => {
         } else {
             await db.collection('post').insertOne({
                 title: request.body.title,
-                content: request.body.content
+                content: request.body.content,
+                user: request.user._id,
+                username: request.user.username
             });
             response.redirect('/list')
         }
@@ -147,7 +149,7 @@ app.get('/detail/:id', async (request, response) => {
 })
 
 app.get('/edit/:id', async (request, response) => {
-    console.log('edit: ', request.user)
+    // console.log('edit: ', request.user)
     if(request.user?.username) {
         let result = await db.collection('post').findOne({_id: new ObjectId(request.params.id)})
         
@@ -174,7 +176,8 @@ app.put('/edit', async (request, response) => {
 app.delete('/delete', async (request, response) => {
     // console.log(request.query)
     await db.collection('post').deleteOne({
-        _id: new ObjectId(request.query.docId)
+        _id: new ObjectId(request.query.docId),
+        user : new ObjectId(request.user._id)
     })
     response.send('success')
 })
@@ -243,9 +246,41 @@ app.post('/register', emptyInputCheck, async (request, response)=> {
     response.redirect('/')
 })
 
-app.use('/shop', require('./routes/shop.js'))
+app.get('/search', async (request, response) => {
+    // console.log(request.query.search)
+    // if(request.body?.search == '') {
+    //     return response.status(400).json('검색어를 입력하세요');
+    // }
+    if(request.query?.search == '') {
+        return response.status(400).json('검색어를 입력하세요');
+    }
 
-app.use('/board/sub', require('./routes/board.js'))
+    /*1. db 에서 검색어 데이터 가져오는 소스
+        let result = await db.collection('post').find({
+            // title: request.query.search
+            // title: {$regex : request.query.search}
+            $text : {$search : request.query.search}
+        }).toArray();
+        //.explain('executionStats') db 성능 평가 가능
+        // console.log(result)
+    */
+
+    //2. db에서 search index 사용해서 document 검색하기
+    let searchCondition = [
+        { $search : {
+            index : 'title_index',
+            text : { query : request.query.search, path: 'title' }
+        }}
+    ]
+    let result = await db.collection('post')
+        .aggregate(searchCondition)
+        .toArray();
+
+    response.render('search.ejs', {posts: result})
+})
+// app.use('/shop', require('./routes/shop.js'))
+
+// app.use('/board/sub', require('./routes/board.js'))
 
 //조회  /post GET
 //발행  /post POST
