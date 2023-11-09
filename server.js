@@ -2,6 +2,8 @@ const express = require('express');
 const app = express();
 const {MongoClient, ObjectId} = require('mongodb');
 const methodOverride = require('method-override');
+const bcrypt = require('bcrypt');
+require('dotenv').config();
 
 app.use(methodOverride('_method'));
 app.use(express.static(__dirname + '/public'))
@@ -10,17 +12,35 @@ app.set('view engine', 'ejs'); //ejs 셋팅 끝
 app.use(express.json())
 app.use(express.urlencoded({extended: true}))
 
+//passport lib 셋팅
+const session = require('express-session');
+const passport = require('passport');
+const LocalStrategy = require('passport-local');
+const MongoStore = require('connect-mongo');
+const connectDB = require('./database.js');
+
+app.use(passport.initialize());
+app.use(session({
+    secret: 'qwert123',
+    resave: false, //유저가 서버로 요청할 때마다 세션 갱신할건지
+    saveUninitialized: false, // 로그인 안해도 세션 만들것인지,
+    cookie: { maxAge: 60 * 60 * 1000 },
+    store: MongoStore.create({
+        mongoUrl: process.env.DB_URL,
+        dbName: 'nodeForum'
+    })
+}));
+app.use(passport.session());
 
 
 
 let db;
-const url = 'mongodb+srv://admin:qwer1234@cluster0.ufvmf9v.mongodb.net/?retryWrites=true&w=majority';
-new MongoClient(url).connect().then((client) => {
+connectDB.then((client) => {
     // console.log('db connect success')
     db = client.db('nodeForum')
 
     //서버 띄울 port 번호
-    app.listen(8080, () => {
+    app.listen(process.env.PORT, () => {
         console.log('http://localhost:8080 에서 서버 실행 중')
     })
 
@@ -29,12 +49,61 @@ new MongoClient(url).connect().then((client) => {
 })
 
 
+passport.use(new LocalStrategy(async (id, pw, cb) => {
+    try{
+        let result = await db.collection('user').findOne({ username: id})
+        if(!result){
+            return cb(null, false, {message : 'ID DB 에 없음'})
+        }
+
+        if(await bcrypt.compare(pw, result.password)){
+            return cb(null, result)
+        } else {
+            return cb(null, false, {message: '비번 불일치'})
+        }
+    }catch(e) {
+        console.log(e)
+    }
+}))
+
+passport.serializeUser((user, done) => {
+    process.nextTick(() => { //내부 코드를 비동기적으로 처리하고 싶을 때 사용하는 코드
+        done(null, { id: user._id, username: user.username})
+    })
+})
+
+//유저가 보낸 쿠키를 분석해주는 코드
+passport.deserializeUser( async (user, done) => {
+    let result = await db.collection('user').findOne({_id: new ObjectId(user.id)})
+    delete result.password;
+
+    process.nextTick(() => { //내부 코드를 비동기적으로 처리하고 싶을 때 사용하는 코드
+        done(null, result)
+    })
+})
+
+function checkLogin(request, response, next) {
+    if(!request.user){
+        response.send('로긴하세요')
+    }
+    next(); //미들웨어 코드 실행 끝났으니 다음으로 실행해주세요
+}
+
+function emptyInputCheck(request, response, next){
+    if(request.body.username !== '' || request.body.password !== ''){
+        next();
+    } else {
+        response.status(400).json('아이디, 비번 빈칸 안돼염')
+    }
+}
+
 //서버 기능 구현
+//checkLogin 는 미들웨어임
 app.get('/', (request, response) => {
     response.sendFile(__dirname+'/index.html')
 })
 
-app.get('/list', async (request, response) => {
+app.get('/list', (request, response, next) => {console.log(new Date()); next()}, async (request, response) => {
     let result = await db.collection('post').find().toArray()
     response.render('list.ejs', {posts: result})
 })
@@ -78,9 +147,14 @@ app.get('/detail/:id', async (request, response) => {
 })
 
 app.get('/edit/:id', async (request, response) => {
-    let result = await db.collection('post').findOne({_id: new ObjectId(request.params.id)})
-    
-    response.render('edit.ejs', {result: result})
+    console.log('edit: ', request.user)
+    if(request.user?.username) {
+        let result = await db.collection('post').findOne({_id: new ObjectId(request.params.id)})
+        
+        response.render('edit.ejs', {result: result})
+    } else {
+        return response.status(400).json('로그인 한 유저만 글 작성이 가능합니다.')
+    }
 })
 
 app.put('/edit', async (request, response) => {
@@ -127,3 +201,53 @@ app.get('/list/next/:id', async (request, response) => {
 
     response.render('list.ejs', {posts: result})
 })
+
+app.get('/login', (request, response) => {
+    response.render('login.ejs')
+})
+
+app.post('/login', emptyInputCheck, async (request, response, next) => {
+    passport.authenticate('local', (error, user, info)=> {
+        // console.log(user, info)
+        if(error) return response.status(500).json(error);
+        if(!user) return response.status(401).json(info.message);
+        
+        request.logIn(user, (err)=> {
+            if(err) return next(err)
+
+            response.render('myPage.ejs', {user: user});
+        })
+    })(request, response, next)
+})
+
+app.get('/register', (request, response) => {
+    response.render('register.ejs')
+})
+
+app.post('/register', emptyInputCheck, async (request, response)=> {
+
+    let hash = await bcrypt.hash(request.body.password, 10);
+
+    if(request.body.username == '') return response.status(400).json('username 빈칸 작성 불가')
+    if(request.body.password.length < 5) return response.status(400).json('비번이 너무 짧음')
+    
+    let result = await db.collection('user').findOne({username: request.body.username});
+    // console.log(result)
+    if(request.body.username === result?.username) return response.status(400).json('이미 가입되어있습니다.')
+
+    await db.collection('user').insertOne({
+        username: request.body.username,
+        password: hash
+    })
+
+    response.redirect('/')
+})
+
+app.use('/shop', require('./routes/shop.js'))
+
+app.use('/board/sub', require('./routes/board.js'))
+
+//조회  /post GET
+//발행  /post POST
+//수정  /post PUT
+//삭제  /post DELETE

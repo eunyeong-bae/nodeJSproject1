@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="/main.css" rel="stylesheet"/>
+</head>
+<body class="grey-bg">
+    <!-- %- : include 문법 사용할 때 or 사용하면 html 이 렌더링되어 나옴 -->
+    <%- include('nav.ejs') %>
+
+    <form class="form-box" action="/register" method="POST">
+        <h4>가입</h4>
+        <input name="username" type="text">
+        <input name="password" type="password">
+        <button type="submit">전송</button>
+    </form>
+</body>
+</html>
