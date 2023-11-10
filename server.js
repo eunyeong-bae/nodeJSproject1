@@ -3,6 +3,13 @@ const app = express();
 const {MongoClient, ObjectId} = require('mongodb');
 const methodOverride = require('method-override');
 const bcrypt = require('bcrypt');
+
+//socket.io lib 셋팅 문법
+const {createServer} = require('http');
+const { Server } = require('socket.io');
+const server = createServer(app);
+const io = new Server(server);
+
 require('dotenv').config();
 
 app.use(methodOverride('_method'));
@@ -40,7 +47,7 @@ connectDB.then((client) => {
     db = client.db('nodeForum')
 
     //서버 띄울 port 번호
-    app.listen(process.env.PORT, () => {
+    server.listen(process.env.PORT, () => {
         console.log('http://localhost:8080 에서 서버 실행 중')
     })
 
@@ -289,7 +296,7 @@ app.post('/comment', async (request, response) => {
         return response.status(400).json('댓글 입력하세요')
     }
 
-    let result = await db.collection('comment').insertOne({
+    await db.collection('comment').insertOne({
         comment : request.body.comment,
         writer : request.user.username,
         writerId: new ObjectId(request.user._id),
@@ -297,8 +304,63 @@ app.post('/comment', async (request, response) => {
     })
 
     response.redirect('back')
+    
     // console.log("comment result: ",result)
 })
+
+app.get('/chat/request',  async (request, response) => {
+    await db.collection('chatroom').insertOne({
+        member: [request.user._id, new ObjectId(request.query.writerId)],
+        date: new Date()
+    })
+    response.redirect('/chat/list')
+})
+
+app.get('/chat/list', async (request, response) => {
+    let result = await db.collection('chatroom').find({
+        member : request.user._id
+    }).toArray();
+    
+    response.render('chatList.ejs', {result : result})
+})
+
+app.get('/chat/detail/:id', async (request, response) => {
+    let result = await db.collection('chatroom')
+        .findOne({_id: new ObjectId(request.params.id)})
+        // console.log(result)
+    response.render('chatDetail.ejs', {result: result})
+})
+
+io.on('connection', (socket) => {
+    //user -> server data send
+    socket.on('age', (data) => {
+        // console.log(data)
+        //server -> user data send
+        io.emit('name', 'kim')
+    })
+
+    socket.on('ask-join', (data)=> {
+        // console.log(data)
+        //채팅방에 속하지 않은 유저가 룸 join 요청 시 막는 코드 추가
+        // console.log(socket.request.session)
+
+        //유저를 룸에 넣는 건 서버만 가능
+        socket.join(data)
+    })
+
+    socket.on('message', (data) => {
+        // console.log(data)
+        io.to(data.room).emit('broadcast',data.msg)
+    })
+
+    socket.on('message-send', function(data){
+        // console.log(data)
+        io.on(data.room).emit('message-broadcast', data.msg)
+    })
+})
+
+
+
 
 // app.use('/shop', require('./routes/shop.js'))
 
