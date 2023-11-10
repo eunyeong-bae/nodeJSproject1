@@ -135,12 +135,16 @@ app.post('/newpost', async (request, response) => {
 
 app.get('/detail/:id', async (request, response) => {
     try {
+        let comments = await db.collection('comment').find({
+            parentId: new ObjectId(request.params.id)
+        }).toArray();
+
         let result = await db.collection('post').findOne({_id: new ObjectId(request.params.id)})
         if(result == null) {
             response.status(404).send('이상한 url 입력함')
         }
-
-        response.render('detail.ejs', {data : result})
+        // console.log('detail: ', result)
+        response.render('detail.ejs', {data : result, comment: comments})
 
     }catch(e) {
         console.log(e)
@@ -278,6 +282,24 @@ app.get('/search', async (request, response) => {
 
     response.render('search.ejs', {posts: result})
 })
+
+app.post('/comment', async (request, response) => {
+    // console.log('commnet: ', request.body)
+    if(request.body?.comment == '') {
+        return response.status(400).json('댓글 입력하세요')
+    }
+
+    let result = await db.collection('comment').insertOne({
+        comment : request.body.comment,
+        writer : request.user.username,
+        writerId: new ObjectId(request.user._id),
+        parentId: new ObjectId(request.body.parent)
+    })
+
+    response.redirect('back')
+    // console.log("comment result: ",result)
+})
+
 // app.use('/shop', require('./routes/shop.js'))
 
 // app.use('/board/sub', require('./routes/board.js'))

@@ -13,6 +13,21 @@
     <div class="detail-bg">
         <h4><%= data.title %></h4>
         <p><%= data.content %></p>
+
+        <hr style="margin-top: 60px;">
+        <div>
+            <% for(let i =0; i<comment.length; i++){ %>
+                <p>
+                    <strong><%= comment[i].writer %></strong> 
+                    <%= comment[i].comment %>
+                </p>
+            <% } %>
+        </div>
+        <form action="/comment" method="POST">
+            <input name="comment" placeholder="댓글 입력" />
+            <input name="parent" value="<%= data._id%>" style="display: none;" />
+            <button type="submit">댓글작성</button>
+        </form>
     </div>
 </body>
 </html>
